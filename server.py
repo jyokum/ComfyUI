@@ -3,6 +3,7 @@ import sys
 import asyncio
 import traceback
 
+import ssl
 import nodes
 import folder_paths
 import execution
@@ -613,14 +614,27 @@ class PromptServer():
     async def start(self, address, port, verbose=True, call_on_start=None):
         runner = web.AppRunner(self.app, access_log=None)
         await runner.setup()
-        site = web.TCPSite(runner, address, port)
+        ctx = None
+        scheme = "http"
+
+        if args.tls and os.path.exists(args.tls_certfile) and os.path.exists(args.tls_keyfile):
+            ctx = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_SERVER)
+            # ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            ctx.load_cert_chain(certfile=args.tls_certfile, keyfile=args.tls_keyfile)
+            scheme = "https"
+        else:
+            print("TLS file(s) not found. Check paths to files.")
+            print("tls-certfile = {}".format(args.tls_certfile))
+            print("tls-keyfile = {}".format(args.tls_keyfile))
+
+        site = web.TCPSite(runner, address, port, ssl_context=ctx)
         await site.start()
 
         if address == '':
             address = '0.0.0.0'
         if verbose:
             print("Starting server\n")
-            print("To see the GUI go to: http://{}:{}".format(address, port))
+            print("To see the GUI go to: {}://{}:{}".format(scheme, address, port))
         if call_on_start is not None:
             call_on_start(address, port)
 
